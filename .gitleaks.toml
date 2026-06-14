@@ -1,0 +1,19 @@
+# gitleaks configuration for the MeshCore MQTT observer firmware fork.
+#
+# Security policy for this fork: NO broker or WiFi credentials are baked into any build —
+# they are configured at runtime over the serial CLI only. This scanner guards that policy
+# (we push to a public fork). The pinned X.509 CA certificates (MESHCORE_CA, GTS_ROOT_R4) are
+# PUBLIC server-verification material, not secrets, and are intentionally present in the source.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public CA certificates and default placeholder build passwords (not real secrets)"
+regexes = [
+  # Pinned public X.509 CA certificates used for TLS server verification.
+  '''-----BEGIN CERTIFICATE-----''',
+  # Upstream default placeholder build passwords (agessaman envs) — not secrets.
+  '''ADMIN_PASSWORD=.{0,3}"password"''',
+  '''ROOM_PASSWORD=.{0,3}"hello"''',
+]

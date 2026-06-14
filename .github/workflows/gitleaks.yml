@@ -1,0 +1,21 @@
+name: gitleaks
+
+# Secret scan for the observer fork. Defence-in-depth alongside the local .githooks/pre-commit:
+# the hook blocks secrets before they are committed; this catches anything that slips past on push/PR.
+on:
+  pull_request:
+  push:
+    branches:
+      - room-server-observer-116
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml

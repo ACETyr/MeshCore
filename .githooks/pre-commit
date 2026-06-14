@@ -1,0 +1,18 @@
+#!/bin/sh
+# Pre-commit secret scan. Blocks commits that introduce secrets (broker/WiFi credentials,
+# private keys, tokens). Policy: NO credentials are baked into this firmware — see .gitleaks.toml.
+#
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks not found in PATH — skipping secret scan (install: scoop install gitleaks)" >&2
+  exit 0
+fi
+
+gitleaks protect --staged --redact --no-banner
+if [ $? -ne 0 ]; then
+  echo "" >&2
+  echo "x gitleaks blocked this commit: a potential secret was detected (see above)." >&2
+  echo "  If it is a false positive, add an allowlist entry to .gitleaks.toml." >&2
+  exit 1
+fi
+exit 0
