@@ -1275,7 +1275,7 @@ void MQTTBridge::connectToBrokers() {
 
       // Set broker URI and connect using PsychicMqttClient API
       char broker_uri[128];
-      snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%d", _brokers[i].host, _brokers[i].port);
+      buildBrokerUri(i, broker_uri, sizeof(broker_uri));
       _mqtt_client->setServer(broker_uri);
 
       // Set credentials if provided
@@ -1300,7 +1300,7 @@ void MQTTBridge::connectToBrokers() {
       if (reconnect_elapsed >= delay_ms) {
         MQTT_DEBUG_PRINTLN("Reconnecting to broker %d: %s:%d (backoff)", i, _brokers[i].host, _brokers[i].port);
         char broker_uri[128];
-        snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%d", _brokers[i].host, _brokers[i].port);
+        buildBrokerUri(i, broker_uri, sizeof(broker_uri));
         _mqtt_client->setServer(broker_uri);
         if (strlen(_brokers[i].username) > 0) {
           _mqtt_client->setCredentials(_brokers[i].username, _brokers[i].password);
@@ -1579,7 +1579,7 @@ bool MQTTBridge::publishStatus() {
                   
                   // Build broker URI
                   char broker_uri[128];
-                  snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%d", _brokers[i].host, _brokers[i].port);
+                  buildBrokerUri(i, broker_uri, sizeof(broker_uri));
                   
                   // Only call setServer() if broker URI changed (reduces memory allocations)
                   if (strcmp(broker_uri, last_broker_uri_shared) != 0) {
@@ -1754,7 +1754,7 @@ void MQTTBridge::publishPacket(mesh::Packet* packet, bool is_tx,
         if (_brokers[i].enabled && _brokers[i].connected && _mqtt_client->connected()) {
           // Build broker URI
           char broker_uri[128];
-          snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%d", _brokers[i].host, _brokers[i].port);
+          buildBrokerUri(i, broker_uri, sizeof(broker_uri));
           
           // Only call setServer() if broker URI changed (reduces memory allocations)
           if (strcmp(broker_uri, last_broker_uri) != 0) {
@@ -1880,7 +1880,7 @@ void MQTTBridge::publishRaw(mesh::Packet* packet) {
         if (_brokers[i].enabled && _brokers[i].connected && _mqtt_client->connected()) {
           // Build broker URI
           char broker_uri[128];
-          snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%d", _brokers[i].host, _brokers[i].port);
+          buildBrokerUri(i, broker_uri, sizeof(broker_uri));
           
           // Only call setServer() if broker URI changed (reduces memory allocations)
           if (strcmp(broker_uri, last_broker_uri_raw) != 0) {
@@ -2074,6 +2074,79 @@ void MQTTBridge::setBroker(int broker_index, const char* host, uint16_t port,
   broker.enabled = enabled;
   broker.connected = false;
   broker.reconnect_interval = 5000;
+}
+
+#ifdef MQTT_CUSTOM_CA_MESHCORE
+// Public (non-secret) self-signed CA of the MeshCore observer broker (CN "MeshCoreCA",
+// valid 2026-03-19 .. 2036-03-16). Pinned because that broker presents a placeholder server
+// CN ("your.broker.host") we don't control, and esp-tls on this prebuilt framework cannot skip
+// verification. A CA cert is public verification material, NOT a credential — see applyBrokerTlsConfig().
+static const char* MESHCORE_CA =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIDCzCCAfOgAwIBAgIUdj8L0aRBJYXy0OTFiW5mvjMG+QswDQYJKoZIhvcNAQEL\n"
+    "BQAwFTETMBEGA1UEAwwKTWVzaENvcmVDQTAeFw0yNjAzMTkyMDI0MjFaFw0zNjAz\n"
+    "MTYyMDI0MjFaMBUxEzARBgNVBAMMCk1lc2hDb3JlQ0EwggEiMA0GCSqGSIb3DQEB\n"
+    "AQUAA4IBDwAwggEKAoIBAQCx8oCqDXZL91qa/Sj3BxpFI4wvzlcOZlje/lRH7wJC\n"
+    "TNCCGarOLDEoIC4/MqoL84WFaMap1VnVF7pMbDrPvlDLV56TSRfAdb8MIV4UyhX8\n"
+    "BWlkdY6Cg9Z3YEELqY5DAyxH0Xjr7W4E9mgS+qvGT230G+5ytm/Fplw2oQU6fwxa\n"
+    "Y6GPrjRrxcj7gESkNzPKa09y6ZD+GCnOuG1RasaRbhZCmp5ygYaNCqz/yVZ7DO6B\n"
+    "8MKfaW8c4YFL+lLNXb81Q8w6p2l5e09UP8f8O7ZysfUXMl3Rz8iG4wjMJvngcH+0\n"
+    "Fp6FraQDKAWpJYMHdnx/OMKk65p6w6HgzD9KqDtdVVHhAgMBAAGjUzBRMB0GA1Ud\n"
+    "DgQWBBSWEkwa8zVcmbMJ/773F4dFsdaCSDAfBgNVHSMEGDAWgBSWEkwa8zVcmbMJ\n"
+    "/773F4dFsdaCSDAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCf\n"
+    "5jxcCH81SvkD06nA80zNbZ3y9ZF2EjvUaYONs6bFMa1SCL1bDYNh3/q98ha7DIgF\n"
+    "mq9VYUyf51yn5lvlJ9a/6ja5zP0Wml6NwtZEjuYTzdnotB3Ei18bbB64KMrGMWgh\n"
+    "1vRCjDDUs18qPdUrOJ/TSh0uMRnvUEpXnSFOrlQvlhjFxncODzTz5df/4wLmbnuk\n"
+    "aEfMutWdM9nTYn5WvwAzChAEKsgM3wksNGla1fwxLz6VxC9pG7IlWI4kMcXCExqa\n"
+    "91xRKqdgruniD59SSCQ1sYRhV/GOgoSJmBb+7C6LoSHlpa4m0EH0AmsZvYDYEejI\n"
+    "W93kiESr2r46mEvU2/mz\n"
+    "-----END CERTIFICATE-----\n";
+#endif
+
+void MQTTBridge::buildBrokerUri(int i, char* out, size_t out_len) {
+  const char* host = _brokers[i].host;
+  const char* scheme_sep = strstr(host, "://");
+  if (scheme_sep) {
+    // Host carries an explicit scheme (e.g. "mqtts://host" for TLS) — preserve it.
+    // Keep an explicit ":port" if present, otherwise append the configured port.
+    if (strchr(scheme_sep + 3, ':')) {
+      snprintf(out, out_len, "%s", host);
+    } else {
+      snprintf(out, out_len, "%s:%d", host, _brokers[i].port);
+    }
+  } else {
+    // No scheme → plaintext (unchanged default behaviour).
+    snprintf(out, out_len, "mqtt://%s:%d", host, _brokers[i].port);
+  }
+  // Apply TLS verification config for the just-built URI (no-op for plaintext). Safe to set
+  // before setServer(): setServer() only assigns broker.address.uri, never touches verification.
+  applyBrokerTlsConfig(out);
+}
+
+void MQTTBridge::applyBrokerTlsConfig(const char* broker_uri) {
+  // Only TLS transports need verification config.
+  if (strncmp(broker_uri, "mqtts://", 8) != 0 && strncmp(broker_uri, "wss://", 6) != 0) return;
+  if (!_mqtt_client) return;
+  // esp-tls REQUIRES a verification option: "encrypt without verify" is unavailable on the
+  // prebuilt Arduino-ESP32 framework (CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY is compiled out;
+  // a no-CA config fails the handshake with ESP_ERR_MBEDTLS_SSL_SETUP_FAILED). So we MUST pin a CA.
+#ifdef MQTT_CUSTOM_CA_MESHCORE
+  // Pin the (public, non-secret) MeshCore observer broker CA and skip the CN check — the broker
+  // presents a placeholder CN ("your.broker.host") we don't control. The CA is long-lived
+  // (valid to 2036), so rotation maintenance is effectively nil. No credentials are baked.
+  _mqtt_client->setCACert(MESHCORE_CA);
+  auto* cfg = _mqtt_client->getMqttConfig();
+  // skip_cert_common_name_check field location differs between ESP-IDF 4 (flat) and 5 (nested).
+#if ESP_IDF_VERSION_MAJOR == 5
+  cfg->broker.verification.skip_cert_common_name_check = true;
+#else
+  cfg->skip_cert_common_name_check = true;
+#endif
+#else
+  // No custom CA pinned → verify against the public mbedTLS certificate bundle. Works for
+  // brokers presenting a publicly-trusted cert (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE is enabled).
+  _mqtt_client->attachArduinoCACertBundle(true);
+#endif
 }
 
 void MQTTBridge::setOrigin(const char* origin) {

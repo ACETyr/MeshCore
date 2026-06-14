@@ -419,6 +419,24 @@ public:
   void optimizeMqttClientConfig(PsychicMqttClient* client, bool is_analyzer_client = false);
 
   /**
+   * Build the connection URI for a main broker, preserving an explicit scheme, AND apply the
+   * matching TLS verification config via applyBrokerTlsConfig(). If the configured host carries
+   * a scheme (e.g. "mqtts://host" for TLS), it is kept; otherwise plaintext "mqtt://" is used.
+   * An explicit ":port" in the host is preserved, else _brokers[i].port is appended.
+   * Call immediately before setServer() at each broker connect/reconnect/publish site.
+   */
+  void buildBrokerUri(int broker_index, char* out, size_t out_len);
+
+  /**
+   * Apply the TLS verification config for a TLS transport (mqtts://, wss://). esp-tls on the
+   * prebuilt Arduino-ESP32 framework cannot skip verification, so a CA is always required:
+   * with MQTT_CUSTOM_CA_MESHCORE the pinned MeshCore broker CA is used + skip_cert_common_name_check
+   * (the broker has a placeholder CN); otherwise the public mbedTLS CA bundle. No-op for plaintext.
+   * Safe to call before setServer() (setServer only assigns the URI, never the verification config).
+   */
+  void applyBrokerTlsConfig(const char* broker_uri);
+
+  /**
    * Enable/disable message types
    *
    * @param status Enable status messages
