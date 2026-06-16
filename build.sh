@@ -203,8 +203,10 @@ build_repeater_firmwares() {
 #  build_firmware "LilyGo_T3S3_sx1262_Repeater"
 #  build_firmware "RAK_4631_Repeater"
 
-  # build all repeater firmwares
-  build_all_firmwares_by_suffix "_repeater"
+  # fwdfilter fork: ship only the maintained/testable boards (RAK4631 + Heltec V3),
+  # not every repeater target -- avoids releasing untested binaries for boards we don't have.
+  build_firmware "RAK_4631_repeater"
+  build_firmware "Heltec_v3_repeater"
 
 }
 
