@@ -116,8 +116,11 @@ CoreScope correlation — not reproducible on a low-traffic bench.
 - [x] `filterRecvFloodPacket` path-prune steering
 - [x] Builds clean: `pio run -e RAK_4631_repeater` (+ `_debug` variant)
 - [x] Debug build variant with drop/prune serial logging (`RAK_4631_repeater_debug`)
-- [x] Bench smoke test on RAK4631 devboard: `all` mode dropped 2/2 received 1-byte packets with the
-      expected `fwd-filter: drop 1-byte pkt` serial log; CLI set/get/persist confirmed (2026-06-16)
-- [ ] Exercise `advert` mode + Stage 2 blacklist (needs a deterministic 2nd-node sender; edge traffic
-      too sparse to reliably hit a 1-byte advert / blocklisted-path flood)
+- [x] Bench smoke test on RAK4631 devboard: `all` mode dropped 2/2 received 1-byte packets (2026-06-16)
+- [x] Deterministic 2-node test (Heltec companion_radio_usb sender + RAK4631 repeater, radio matched
+      to EU-narrow 869.618/62.5/SF8/CR8): **4/4 PASS** (2026-06-16) — advert-mode drops 1-byte advert /
+      forwards multibyte; Stage-2 `advert` blacklist drops the targeted pubkey / forwards after clear.
+      Orchestrator: `reference/orchestrate_test.py`.
+- [ ] PRUNE_PATH (filterRecvFloodPacket steering) — not exercisable on a 2-node rig (origin pubkey is
+      never a path hop); needs a 3-node topology or ambient relayed multibyte floods.
 - [ ] Mountain deploy + CoreScope impact measurement
