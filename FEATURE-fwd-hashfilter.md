@@ -92,9 +92,11 @@ Functional verification is about the forward/drop decision, not statistics — a
 suffices. Build the debug variant which enables serial packet logging + `MESH_DEBUG`, so each
 drop/prune prints to the USB console:
 
-    pio run -e RAK_4631_repeater_debug -t upload
+    pio run -e RAK_4631_repeater_debug
 
-Then over serial:
+This auto-generates `.pio/build/RAK_4631_repeater_debug/firmware.uf2` (post-build script
+`variants/rak4631/gen_uf2.py`, family 0xADA52840). Flash by double-tapping reset on the RAK4631
+(it mounts as a USB drive) and copying `firmware.uf2` onto it. Then over serial:
 1. `set fwd.hashfilter advert` (or `all`) → watch for `fwd-filter: drop 1-byte advert ...` lines.
 2. `set fwd.block.add <64-hex-pubkey> prune` then `get fwd.block` → on a matching multibyte flood,
    watch for `fwd-filter: prune flood via blocklisted node ...`.
