@@ -1,6 +1,6 @@
 # Repeater forward filter for 1-byte path-hash traffic
 
-**Status:** Stage 1 implemented (stateless hash-size filter). Stage 2 (pubkey policy table) planned.
+**Status:** Stage 1 (stateless hash-size filter) + Stage 2 (pubkey policy table) implemented, build-verified. Hardware test pending.
 **Branch:** `repeater-hash-filter` (off `dev`, clean mainline 1.16). **Target:** `RAK_4631_repeater` (nRF52840).
 **Tracking:** local doc (no upstream issue yet — publish later).
 
@@ -50,10 +50,34 @@ Start with `set fwd.hashfilter advert` (+ optional `prob` < 100 to soften). Do N
 of the network is still 1-byte — it would drop most relayed traffic at an exposed linking node.
 Measurement stays external (observer/CoreScope); no on-device counter in Stage 1.
 
+## Stage 2 — implemented
+
+Per-pubkey forward policy table (full 32-byte keys), max `FWD_BLOCK_MAX = 16` entries, persisted in
+NodePrefs at /com_prefs offsets 295.. (count + 16×32 keys + 16 actions = 529 B; back-compat: empty if
+absent). Two action flags:
+- `FWD_BLOCK_PRUNE_PATH` (0x01) — hook `filterRecvFloodPacket`: drop any flood copy whose path contains
+  this node. Called before `hasSeen()`, so the dropped copy is NOT marked seen → a copy via a different
+  path can still win. This steers floods off bad branches (beats naive "first packet wins"). Path holds
+  hash prefixes → reliable at multibyte sizes; 1-byte is covered by the Stage 1 hash-size filter.
+- `FWD_BLOCK_DROP_ADVERT` (0x02) — hook `allowPacketForward`: don't forward adverts originated by this
+  node (exact full-pubkey match against the advert payload), at any hash size.
+
+CLI (admin):
+- `set fwd.block.add <64-hex-pubkey> [prune|advert|both]` — default `prune`
+- `set fwd.block.del <hex-or-prefix>` — removes all entries matching the prefix
+- `set fwd.block.clear`
+- `get fwd.block` — lists entries (6-byte prefix + flags P/A)
+
+Changes: `CommonCLI.h` (FWD_BLOCK_* defines + table fields), `CommonCLI.cpp` (persist 295.., constrain,
+3 set handlers + get), `simple_repeater/MyMesh.cpp` (prune in `filterRecvFloodPacket`, advert-drop in
+`allowPacketForward`). Builds clean; RAM 13.8%, Flash 63.0%.
+
+RAM note: 16-entry table = 529 B, trivial on the nRF52840's 256 KB. Raise `FWD_BLOCK_MAX` only modestly.
+
 ## Checklist
-- [x] NodePrefs fields + persistence (offsets 293/294, back-compat)
-- [x] CLI set/get handlers
-- [x] `allowPacketForward` filter (mode + probability)
+- [x] NodePrefs fields + persistence (Stage 1 offsets 293/294, Stage 2 295.., back-compat)
+- [x] CLI set/get handlers (hashfilter + block table)
+- [x] `allowPacketForward` filter (hash-size mode+prob, plus DROP_ADVERT)
+- [x] `filterRecvFloodPacket` path-prune steering
 - [x] Builds clean: `pio run -e RAK_4631_repeater`
-- [ ] On-hardware smoke test (set advert mode, confirm via `get`, observe drop in CoreScope)
-- [ ] Stage 2: pubkey policy table + `filterRecvFloodPacket` steering
+- [ ] On-hardware smoke test (set modes, confirm via `get`, observe effect in CoreScope)
