@@ -438,6 +438,17 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
       return false;
     }
   }
+  // Forward policy: suppress adverts originated by a blacklisted node (DROP_ADVERT), at any hash size.
+  // An advert's payload begins with the originator's full pub_key, so this is an exact identity match.
+  if (_prefs.fwd_block_count > 0 && packet->getPayloadType() == PAYLOAD_TYPE_ADVERT
+      && packet->payload_len >= PUB_KEY_SIZE) {
+    for (uint8_t k = 0; k < _prefs.fwd_block_count; k++) {
+      if ((_prefs.fwd_block_actions[k] & FWD_BLOCK_DROP_ADVERT)
+          && memcmp(packet->payload, _prefs.fwd_block_keys[k], PUB_KEY_SIZE) == 0) {
+        return false;
+      }
+    }
+  }
   if (packet->isRouteFlood()) {
     if (packet->getPathHashCount() >= _prefs.flood_max) return false;
     if (packet->getRouteType() == ROUTE_TYPE_FLOOD && packet->getPathHashCount() >= _prefs.flood_max_unscoped) return false;
@@ -571,6 +582,23 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* pkt) {
     }
   } else {
     recv_pkt_region = NULL;
+  }
+  // Forward policy: prune flood copies whose path traverses a blacklisted node (PRUNE_IF_IN_PATH).
+  // Called before hasSeen(), so returning true drops THIS copy without marking it seen -- a copy
+  // arriving via a different/better path can still win. Path entries are hash prefixes, so matching
+  // is reliable only at multibyte sizes (1-byte is handled broadly by the hash-size filter).
+  if (_prefs.fwd_block_count > 0) {
+    uint8_t sz = pkt->getPathHashSize();
+    uint8_t n = pkt->getPathHashCount();
+    for (uint8_t h = 0; h < n; h++) {
+      const uint8_t* hop = &pkt->path[h * sz];
+      for (uint8_t k = 0; k < _prefs.fwd_block_count; k++) {
+        if ((_prefs.fwd_block_actions[k] & FWD_BLOCK_PRUNE_PATH)
+            && memcmp(hop, _prefs.fwd_block_keys[k], sz) == 0) {
+          return true;  // drop this copy; not marked seen
+        }
+      }
+    }
   }
   // do normal processing
   return false;

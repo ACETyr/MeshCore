@@ -19,6 +19,11 @@
 #define LOOP_DETECT_MODERATE  2
 #define LOOP_DETECT_STRICT    3
 
+// Forward policy table (repeater builds): per-pubkey actions on forwarding.
+#define FWD_BLOCK_MAX          16
+#define FWD_BLOCK_PRUNE_PATH   0x01   // drop flood copies whose path contains this node (filterRecvFloodPacket)
+#define FWD_BLOCK_DROP_ADVERT  0x02   // do not forward adverts originated by this node (allowPacketForward)
+
 struct NodePrefs { // persisted to file
   float airtime_factor;
   char node_name[32];
@@ -66,6 +71,10 @@ struct NodePrefs { // persisted to file
   // Net-health forward filter (repeater builds): throttle forwarding of unidentifiable 1-byte path-hash floods.
   uint8_t fwd_hashfilter_mode;   // 0 = off, 1 = adverts only, 2 = all flood/direct traffic
   uint8_t fwd_hashfilter_prob;   // 0..100 = % chance to drop a matched 1-byte packet (100 = always)
+  // Forward policy table: per-pubkey actions (FWD_BLOCK_* flags). Full 32-byte keys.
+  uint8_t fwd_block_count;                          // active entries (0..FWD_BLOCK_MAX)
+  uint8_t fwd_block_keys[FWD_BLOCK_MAX][32];        // PUB_KEY_SIZE
+  uint8_t fwd_block_actions[FWD_BLOCK_MAX];
 };
 
 class CommonCLICallbacks {

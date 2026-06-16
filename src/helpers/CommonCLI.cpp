@@ -96,7 +96,14 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     _prefs->fwd_hashfilter_prob = 100;
     file.read((uint8_t *)&_prefs->fwd_hashfilter_mode, sizeof(_prefs->fwd_hashfilter_mode)); // 293
     file.read((uint8_t *)&_prefs->fwd_hashfilter_prob, sizeof(_prefs->fwd_hashfilter_prob)); // 294
-    // next: 295
+    // forward policy table; defaults to empty if absent in an older /com_prefs
+    _prefs->fwd_block_count = 0;
+    memset(_prefs->fwd_block_keys, 0, sizeof(_prefs->fwd_block_keys));
+    memset(_prefs->fwd_block_actions, 0, sizeof(_prefs->fwd_block_actions));
+    file.read((uint8_t *)&_prefs->fwd_block_count, sizeof(_prefs->fwd_block_count));     // 295
+    file.read((uint8_t *)_prefs->fwd_block_keys, sizeof(_prefs->fwd_block_keys));        // 296
+    file.read((uint8_t *)_prefs->fwd_block_actions, sizeof(_prefs->fwd_block_actions));  // 808
+    // next: 824
 
     // sanitise bad pref values
     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -113,6 +120,7 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     _prefs->path_hash_mode = constrain(_prefs->path_hash_mode, 0, 2);   // NOTE: mode 3 reserved for future
     _prefs->fwd_hashfilter_mode = constrain(_prefs->fwd_hashfilter_mode, 0, 2);
     _prefs->fwd_hashfilter_prob = constrain(_prefs->fwd_hashfilter_prob, 0, 100);
+    if (_prefs->fwd_block_count > FWD_BLOCK_MAX) _prefs->fwd_block_count = 0;  // corrupt → drop table
 
     // sanitise bad bridge pref values
     _prefs->bridge_enabled = constrain(_prefs->bridge_enabled, 0, 1);
@@ -193,7 +201,10 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *)&_prefs->flood_max_advert, sizeof(_prefs->flood_max_advert));       // 292
     file.write((uint8_t *)&_prefs->fwd_hashfilter_mode, sizeof(_prefs->fwd_hashfilter_mode)); // 293
     file.write((uint8_t *)&_prefs->fwd_hashfilter_prob, sizeof(_prefs->fwd_hashfilter_prob)); // 294
-    // next: 295
+    file.write((uint8_t *)&_prefs->fwd_block_count, sizeof(_prefs->fwd_block_count));     // 295
+    file.write((uint8_t *)_prefs->fwd_block_keys, sizeof(_prefs->fwd_block_keys));        // 296
+    file.write((uint8_t *)_prefs->fwd_block_actions, sizeof(_prefs->fwd_block_actions));  // 808
+    // next: 824
 
     file.close();
   }
@@ -692,6 +703,54 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
     } else {
       strcpy(reply, "Error, must be off, advert, or all");
     }
+  } else if (memcmp(config, "fwd.block.add ", 14) == 0) {
+    char buf[160];
+    strncpy(buf, &config[14], sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
+    uint8_t actions = FWD_BLOCK_PRUNE_PATH;   // default: path-prune (steering)
+    char* sp = strchr(buf, ' ');
+    if (sp) {
+      *sp = 0;
+      const char* fl = sp + 1;
+      if (memcmp(fl, "both", 4) == 0) actions = FWD_BLOCK_PRUNE_PATH | FWD_BLOCK_DROP_ADVERT;
+      else if (memcmp(fl, "advert", 6) == 0) actions = FWD_BLOCK_DROP_ADVERT;
+      else if (memcmp(fl, "prune", 5) == 0) actions = FWD_BLOCK_PRUNE_PATH;
+    }
+    uint8_t key[PUB_KEY_SIZE];
+    if (strlen(buf) != PUB_KEY_SIZE * 2 || !mesh::Utils::fromHex(key, PUB_KEY_SIZE, buf)) {
+      strcpy(reply, "Error: need 64-hex pubkey [prune|advert|both]");
+    } else if (_prefs->fwd_block_count >= FWD_BLOCK_MAX) {
+      strcpy(reply, "Error: table full");
+    } else {
+      int idx = -1;
+      for (int k = 0; k < _prefs->fwd_block_count; k++)
+        if (memcmp(_prefs->fwd_block_keys[k], key, PUB_KEY_SIZE) == 0) { idx = k; break; }
+      if (idx < 0) { idx = _prefs->fwd_block_count++; memcpy(_prefs->fwd_block_keys[idx], key, PUB_KEY_SIZE); }
+      _prefs->fwd_block_actions[idx] = actions;
+      savePrefs();
+      strcpy(reply, "OK");
+    }
+  } else if (memcmp(config, "fwd.block.del ", 14) == 0) {
+    const char* hex = &config[14];
+    uint8_t key[PUB_KEY_SIZE];
+    int klen = min((int)strlen(hex), PUB_KEY_SIZE * 2) / 2;
+    int removed = 0;
+    if (klen >= 1 && mesh::Utils::fromHex(key, klen, hex)) {
+      for (int k = 0; k < _prefs->fwd_block_count; ) {
+        if (memcmp(_prefs->fwd_block_keys[k], key, klen) == 0) {
+          for (int j = k; j < _prefs->fwd_block_count - 1; j++) {
+            memcpy(_prefs->fwd_block_keys[j], _prefs->fwd_block_keys[j + 1], PUB_KEY_SIZE);
+            _prefs->fwd_block_actions[j] = _prefs->fwd_block_actions[j + 1];
+          }
+          _prefs->fwd_block_count--; removed++;
+        } else k++;
+      }
+    }
+    savePrefs();
+    sprintf(reply, "OK (%d removed)", removed);
+  } else if (memcmp(config, "fwd.block.clear", 15) == 0) {
+    _prefs->fwd_block_count = 0;
+    savePrefs();
+    strcpy(reply, "OK");
   } else if (memcmp(config, "loop.detect ", 12) == 0) {
     config += 12;
     uint8_t mode;
@@ -862,6 +921,16 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
     const char* m = _prefs->fwd_hashfilter_mode == 1 ? "advert"
                   : (_prefs->fwd_hashfilter_mode == 2 ? "all" : "off");
     sprintf(reply, "> %s prob=%d", m, (int)_prefs->fwd_hashfilter_prob);
+  } else if (memcmp(config, "fwd.block", 9) == 0) {
+    char* p = reply;
+    p += sprintf(p, "> %d entr%s", (int)_prefs->fwd_block_count, _prefs->fwd_block_count == 1 ? "y" : "ies");
+    for (int k = 0; k < _prefs->fwd_block_count && (p - reply) < 200; k++) {
+      char hex[16];
+      mesh::Utils::toHex(hex, _prefs->fwd_block_keys[k], 6); hex[12] = 0;  // 6-byte prefix
+      uint8_t a = _prefs->fwd_block_actions[k];
+      p += sprintf(p, " | %s %s%s", hex, (a & FWD_BLOCK_PRUNE_PATH) ? "P" : "",
+                   (a & FWD_BLOCK_DROP_ADVERT) ? "A" : "");
+    }
   } else if (memcmp(config, "loop.detect", 11) == 0) {
     if (_prefs->loop_detect == LOOP_DETECT_OFF) {
       strcpy(reply, "> off");
