@@ -63,6 +63,9 @@ struct NodePrefs { // persisted to file
   uint8_t rx_boosted_gain; // power settings
   uint8_t path_hash_mode;   // which path mode to use when sending
   uint8_t loop_detect;
+  // Net-health forward filter (repeater builds): throttle forwarding of unidentifiable 1-byte path-hash floods.
+  uint8_t fwd_hashfilter_mode;   // 0 = off, 1 = adverts only, 2 = all flood/direct traffic
+  uint8_t fwd_hashfilter_prob;   // 0..100 = % chance to drop a matched 1-byte packet (100 = always)
 };
 
 class CommonCLICallbacks {

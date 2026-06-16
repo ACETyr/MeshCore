@@ -428,6 +428,16 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
 
 bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
   if (_prefs.disable_fwd) return false;
+  // Net-health: throttle forwarding of unidentifiable 1-byte path-hash traffic (1-byte hashes collide
+  // in a 256-value space, so >1000-node networks can't attribute them; pushes nodes to multibyte).
+  // fwd_hashfilter_mode: 0=off, 1=adverts only, 2=all. prob = % chance to drop a matched 1-byte packet.
+  if (_prefs.fwd_hashfilter_mode != 0 && packet->getPathHashSize() == 1) {
+    bool is_advert = packet->getPayloadType() == PAYLOAD_TYPE_ADVERT;
+    if ((_prefs.fwd_hashfilter_mode == 2 || is_advert)
+        && (int)(rand() % 100) < _prefs.fwd_hashfilter_prob) {
+      return false;
+    }
+  }
   if (packet->isRouteFlood()) {
     if (packet->getPathHashCount() >= _prefs.flood_max) return false;
     if (packet->getRouteType() == ROUTE_TYPE_FLOOD && packet->getPathHashCount() >= _prefs.flood_max_unscoped) return false;

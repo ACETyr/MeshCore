@@ -91,7 +91,12 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t *)&_prefs->rx_boosted_gain, sizeof(_prefs->rx_boosted_gain));              // 290
     file.read((uint8_t *)&_prefs->flood_max_unscoped, sizeof(_prefs->flood_max_unscoped));   // 291
     file.read((uint8_t *)&_prefs->flood_max_advert, sizeof(_prefs->flood_max_advert));       // 292
-    // next: 293
+    // defaults preserved if absent in an older /com_prefs (file.read reads 0 bytes)
+    _prefs->fwd_hashfilter_mode = 0;
+    _prefs->fwd_hashfilter_prob = 100;
+    file.read((uint8_t *)&_prefs->fwd_hashfilter_mode, sizeof(_prefs->fwd_hashfilter_mode)); // 293
+    file.read((uint8_t *)&_prefs->fwd_hashfilter_prob, sizeof(_prefs->fwd_hashfilter_prob)); // 294
+    // next: 295
 
     // sanitise bad pref values
     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -106,6 +111,8 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     _prefs->multi_acks = constrain(_prefs->multi_acks, 0, 1);
     _prefs->adc_multiplier = constrain(_prefs->adc_multiplier, 0.0f, 10.0f);
     _prefs->path_hash_mode = constrain(_prefs->path_hash_mode, 0, 2);   // NOTE: mode 3 reserved for future
+    _prefs->fwd_hashfilter_mode = constrain(_prefs->fwd_hashfilter_mode, 0, 2);
+    _prefs->fwd_hashfilter_prob = constrain(_prefs->fwd_hashfilter_prob, 0, 100);
 
     // sanitise bad bridge pref values
     _prefs->bridge_enabled = constrain(_prefs->bridge_enabled, 0, 1);
@@ -184,7 +191,9 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *)&_prefs->rx_boosted_gain, sizeof(_prefs->rx_boosted_gain));              // 290
     file.write((uint8_t *)&_prefs->flood_max_unscoped, sizeof(_prefs->flood_max_unscoped));   // 291
     file.write((uint8_t *)&_prefs->flood_max_advert, sizeof(_prefs->flood_max_advert));       // 292
-    // next: 293
+    file.write((uint8_t *)&_prefs->fwd_hashfilter_mode, sizeof(_prefs->fwd_hashfilter_mode)); // 293
+    file.write((uint8_t *)&_prefs->fwd_hashfilter_prob, sizeof(_prefs->fwd_hashfilter_prob)); // 294
+    // next: 295
 
     file.close();
   }
@@ -668,6 +677,21 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
     } else {
       strcpy(reply, "Error, must be 0,1, or 2");
     }
+  } else if (memcmp(config, "fwd.hashfilter.prob ", 20) == 0) {
+    _prefs->fwd_hashfilter_prob = constrain(atoi(&config[20]), 0, 100);
+    savePrefs();
+    strcpy(reply, "OK");
+  } else if (memcmp(config, "fwd.hashfilter ", 15) == 0) {
+    config += 15;
+    if (memcmp(config, "off", 3) == 0) {
+      _prefs->fwd_hashfilter_mode = 0; savePrefs(); strcpy(reply, "OK");
+    } else if (memcmp(config, "advert", 6) == 0) {
+      _prefs->fwd_hashfilter_mode = 1; savePrefs(); strcpy(reply, "OK");
+    } else if (memcmp(config, "all", 3) == 0) {
+      _prefs->fwd_hashfilter_mode = 2; savePrefs(); strcpy(reply, "OK");
+    } else {
+      strcpy(reply, "Error, must be off, advert, or all");
+    }
   } else if (memcmp(config, "loop.detect ", 12) == 0) {
     config += 12;
     uint8_t mode;
@@ -834,6 +858,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
     *reply = 0;  // set null terminator
   } else if (memcmp(config, "path.hash.mode", 14) == 0) {
     sprintf(reply, "> %d", (uint32_t)_prefs->path_hash_mode);
+  } else if (memcmp(config, "fwd.hashfilter", 14) == 0) {
+    const char* m = _prefs->fwd_hashfilter_mode == 1 ? "advert"
+                  : (_prefs->fwd_hashfilter_mode == 2 ? "all" : "off");
+    sprintf(reply, "> %s prob=%d", m, (int)_prefs->fwd_hashfilter_prob);
   } else if (memcmp(config, "loop.detect", 11) == 0) {
     if (_prefs->loop_detect == LOOP_DETECT_OFF) {
       strcpy(reply, "> off");
