@@ -21,6 +21,18 @@ The network is migrating to multibyte hashes, but many old repeaters/companions 
   **adverts** is self-targeting: old nodes exist only as 1-byte (fully suppressed), modern nodes still
   propagate via their multibyte copy (only the redundant downgraded duplicate is trimmed).
 
+### Why no region/scope awareness
+Measured 2026-06-16 (7-day store): only **2.99%** of traffic is transport-scoped (TRANSPORT_FLOOD/DIRECT);
+**97%** is unscoped FLOOD/DIRECT on the wildcard. So MeshCore's region system (`REGION_DENY_FLOOD`) can
+only act on ~3% of packets, and a region-aware filter would miss the problem. This filter is deliberately
+scope-independent — it acts in `allowPacketForward`/`filterRecvFloodPacket` on all floods. (script:
+`reference/routetype.py` in the observer project)
+
+Root cause is compliance, not the concept: regions require companions to send scoped, which they do NOT
+by default, and users who don't engage with the topic never reconfigure. This is the same defaults
+problem as 1-byte hashes — which is why repeater-side enforcement (acting on what arrives) is the
+realistic lever, rather than relying on sender compliance.
+
 ## Design
 
 Two complementary mechanisms, both default OFF, repeater builds only:
