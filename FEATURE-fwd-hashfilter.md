@@ -127,3 +127,6 @@ node + CoreScope correlation — not reproducible on a low-traffic bench.
       is never a path hop, so the controllable sender can't drive this; it's driven by ambient relayed
       traffic. RAK debug build now logs the matched hop bytes.)
 - [ ] Production deploy + CoreScope impact measurement
+- [ ] Next build: add dedicated `get fwd.hashfilter.prob` for set/get symmetry (MeshCore CLI convention;
+      the combined `get fwd.hashfilter` already reports prob, so this is convention-only, deferred from
+      the fwdfilter1 release)
