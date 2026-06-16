@@ -599,8 +599,9 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* pkt) {
       for (uint8_t k = 0; k < _prefs.fwd_block_count; k++) {
         if ((_prefs.fwd_block_actions[k] & FWD_BLOCK_PRUNE_PATH)
             && memcmp(hop, _prefs.fwd_block_keys[k], sz) == 0) {
-          MESH_DEBUG_PRINTLN("fwd-filter: prune flood via blocklisted node (hop %d/%d entry %d)",
-                             (int)h, (int)n, (int)k);
+          char hx[9]; for (uint8_t b = 0; b < sz && b < 4; b++) sprintf(hx + b*2, "%02X", hop[b]);
+          MESH_DEBUG_PRINTLN("fwd-filter: prune %d-byte flood via blocklisted hop %s (hop %d/%d entry %d)",
+                             (int)sz, hx, (int)h, (int)n, (int)k);
           return true;  // drop this copy; not marked seen
         }
       }

@@ -106,8 +106,8 @@ Deterministic option (no ambient traffic): use a second node/companion to emit a
 multibyte advert and confirm only the intended one is relayed. The drop logs are no-ops in the normal
 `RAK_4631_repeater` build (compiled out unless `MESH_DEBUG`).
 
-Impact measurement (how much network traffic changes) is separate and needs the exposed mountain node +
-CoreScope correlation — not reproducible on a low-traffic bench.
+Impact measurement (how much network traffic changes) is separate and needs an exposed, high-throughput
+node + CoreScope correlation — not reproducible on a low-traffic bench.
 
 ## Checklist
 - [x] NodePrefs fields + persistence (Stage 1 offsets 293/294, Stage 2 295.., back-compat)
@@ -121,6 +121,9 @@ CoreScope correlation — not reproducible on a low-traffic bench.
       to EU-narrow 869.618/62.5/SF8/CR8): **4/4 PASS** (2026-06-16) — advert-mode drops 1-byte advert /
       forwards multibyte; Stage-2 `advert` blacklist drops the targeted pubkey / forwards after clear.
       Orchestrator: `reference/orchestrate_test.py`.
-- [ ] PRUNE_PATH (filterRecvFloodPacket steering) — not exercisable on a 2-node rig (origin pubkey is
-      never a path hop); needs a 3-node topology or ambient relayed multibyte floods.
-- [ ] Mountain deploy + CoreScope impact measurement
+- [x] PRUNE_PATH (filterRecvFloodPacket steering) verified on HW (2026-06-16): blocked a known 3-byte
+      bridge repeater with `prune`; ambient multibyte floods relayed through it were pruned — log
+      `prune 2-byte flood via blocklisted hop XXXX (hop 9/10)` — and 0 prunes after clear. (Origin pubkey
+      is never a path hop, so the controllable sender can't drive this; it's driven by ambient relayed
+      traffic. RAK debug build now logs the matched hop bytes.)
+- [ ] Production deploy + CoreScope impact measurement
