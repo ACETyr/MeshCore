@@ -86,10 +86,33 @@ Changes: `CommonCLI.h` (FWD_BLOCK_* defines + table fields), `CommonCLI.cpp` (pe
 
 RAM note: 16-entry table = 529 B, trivial on the nRF52840's 256 KB. Raise `FWD_BLOCK_MAX` only modestly.
 
+## Bench testing (devboard, no traffic volume needed)
+
+Functional verification is about the forward/drop decision, not statistics — a handful of packets
+suffices. Build the debug variant which enables serial packet logging + `MESH_DEBUG`, so each
+drop/prune prints to the USB console:
+
+    pio run -e RAK_4631_repeater_debug -t upload
+
+Then over serial:
+1. `set fwd.hashfilter advert` (or `all`) → watch for `fwd-filter: drop 1-byte advert ...` lines.
+2. `set fwd.block.add <64-hex-pubkey> prune` then `get fwd.block` → on a matching multibyte flood,
+   watch for `fwd-filter: prune flood via blocklisted node ...`.
+3. `set fwd.block.add <64-hex-pubkey> advert` → watch for `fwd-filter: drop advert from blocklisted ...`.
+
+Deterministic option (no ambient traffic): use a second node/companion to emit a known 1-byte vs
+multibyte advert and confirm only the intended one is relayed. The drop logs are no-ops in the normal
+`RAK_4631_repeater` build (compiled out unless `MESH_DEBUG`).
+
+Impact measurement (how much network traffic changes) is separate and needs the exposed mountain node +
+CoreScope correlation — not reproducible on a low-traffic bench.
+
 ## Checklist
 - [x] NodePrefs fields + persistence (Stage 1 offsets 293/294, Stage 2 295.., back-compat)
 - [x] CLI set/get handlers (hashfilter + block table)
 - [x] `allowPacketForward` filter (hash-size mode+prob, plus DROP_ADVERT)
 - [x] `filterRecvFloodPacket` path-prune steering
-- [x] Builds clean: `pio run -e RAK_4631_repeater`
-- [ ] On-hardware smoke test (set modes, confirm via `get`, observe effect in CoreScope)
+- [x] Builds clean: `pio run -e RAK_4631_repeater` (+ `_debug` variant)
+- [x] Debug build variant with drop/prune serial logging (`RAK_4631_repeater_debug`)
+- [ ] Bench smoke test on devboard (debug build, confirm drop logs over serial)
+- [ ] Mountain deploy + CoreScope impact measurement

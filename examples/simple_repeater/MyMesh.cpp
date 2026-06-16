@@ -435,6 +435,9 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
     bool is_advert = packet->getPayloadType() == PAYLOAD_TYPE_ADVERT;
     if ((_prefs.fwd_hashfilter_mode == 2 || is_advert)
         && (int)(rand() % 100) < _prefs.fwd_hashfilter_prob) {
+      MESH_DEBUG_PRINTLN("fwd-filter: drop 1-byte %s (hashfilter mode=%d prob=%d)",
+                         is_advert ? "advert" : "pkt", (int)_prefs.fwd_hashfilter_mode,
+                         (int)_prefs.fwd_hashfilter_prob);
       return false;
     }
   }
@@ -445,6 +448,7 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
     for (uint8_t k = 0; k < _prefs.fwd_block_count; k++) {
       if ((_prefs.fwd_block_actions[k] & FWD_BLOCK_DROP_ADVERT)
           && memcmp(packet->payload, _prefs.fwd_block_keys[k], PUB_KEY_SIZE) == 0) {
+        MESH_DEBUG_PRINTLN("fwd-filter: drop advert from blocklisted node (entry %d)", (int)k);
         return false;
       }
     }
@@ -595,6 +599,8 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* pkt) {
       for (uint8_t k = 0; k < _prefs.fwd_block_count; k++) {
         if ((_prefs.fwd_block_actions[k] & FWD_BLOCK_PRUNE_PATH)
             && memcmp(hop, _prefs.fwd_block_keys[k], sz) == 0) {
+          MESH_DEBUG_PRINTLN("fwd-filter: prune flood via blocklisted node (hop %d/%d entry %d)",
+                             (int)h, (int)n, (int)k);
           return true;  // drop this copy; not marked seen
         }
       }
