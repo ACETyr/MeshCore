@@ -116,5 +116,8 @@ CoreScope correlation — not reproducible on a low-traffic bench.
 - [x] `filterRecvFloodPacket` path-prune steering
 - [x] Builds clean: `pio run -e RAK_4631_repeater` (+ `_debug` variant)
 - [x] Debug build variant with drop/prune serial logging (`RAK_4631_repeater_debug`)
-- [ ] Bench smoke test on devboard (debug build, confirm drop logs over serial)
+- [x] Bench smoke test on RAK4631 devboard: `all` mode dropped 2/2 received 1-byte packets with the
+      expected `fwd-filter: drop 1-byte pkt` serial log; CLI set/get/persist confirmed (2026-06-16)
+- [ ] Exercise `advert` mode + Stage 2 blacklist (needs a deterministic 2nd-node sender; edge traffic
+      too sparse to reliably hit a 1-byte advert / blocklisted-path flood)
 - [ ] Mountain deploy + CoreScope impact measurement
