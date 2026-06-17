@@ -168,8 +168,13 @@ node + CoreScope correlation — not reproducible on a low-traffic bench.
       traffic. RAK debug build now logs the matched hop bytes.)
 - [x] Stage 3 last-hop whitelist: NodePrefs fields + persistence (offsets 824..), CLI set/get,
       `filterRecvFloodPacket` whitelist block with exemptions + 0-hop policy + last-hop match
-- [ ] Stage 3 build-verify (`pio run -e RAK_4631_repeater`) + 2-node bench test (whitelisted last-hop
-      relays / non-whitelisted dropped / advert + ANON_REQ + self-addressed exempt / 0-hop allow vs drop)
+- [x] Stage 3 build-verify (`pio run -e RAK_4631_repeater`, RAM 14.0% Flash 63.2%, + `_debug`)
+- [x] Stage 3 2-node bench test: **10/10 PASS** (2026-06-17, `reference/stage3_test.py`). Verified on HW:
+      CLI round-trip; persistence across reboot (offset 824); advert exemption (relays under whitelist
+      on + 0hop=drop); 0-hop policy (`drop 0-hop flood` at 0hop=drop, none at allow — driven by a channel
+      GRP_TXT flood, non-exempt 0-hop); last-hop match on ambient multi-hop floods (`drop N-byte flood,
+      last-hop XX not whitelisted`, seen at both 1-byte `63` and 3-byte `63D13A`). Note: deterministic
+      last-hop testing needs ambient relayed traffic (controllable sender's origin is never a path hop).
 - [ ] Production deploy + CoreScope impact measurement
 - [ ] Next build: add dedicated `get fwd.hashfilter.prob` for set/get symmetry (MeshCore CLI convention;
       the combined `get fwd.hashfilter` already reports prob, so this is convention-only, deferred from
