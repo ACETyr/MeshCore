@@ -993,7 +993,7 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
   } else if (memcmp(config, "fwd.block", 9) == 0) {
     char* p = reply;
     p += sprintf(p, "> %d entr%s", (int)_prefs->fwd_block_count, _prefs->fwd_block_count == 1 ? "y" : "ies");
-    for (int k = 0; k < _prefs->fwd_block_count && (p - reply) < 200; k++) {
+    for (int k = 0; k < _prefs->fwd_block_count && (p - reply) < 140; k++) {
       char hex[16];
       mesh::Utils::toHex(hex, _prefs->fwd_block_keys[k], 6); hex[12] = 0;  // 6-byte prefix
       uint8_t a = _prefs->fwd_block_actions[k];
@@ -1005,7 +1005,7 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
     p += sprintf(p, "> %s 0hop=%s %d entr%s", _prefs->fwd_whitelist_mode ? "on" : "off",
                  _prefs->fwd_whitelist_zerohop ? "allow" : "drop",
                  (int)_prefs->fwd_whitelist_count, _prefs->fwd_whitelist_count == 1 ? "y" : "ies");
-    for (int k = 0; k < _prefs->fwd_whitelist_count && (p - reply) < 200; k++) {
+    for (int k = 0; k < _prefs->fwd_whitelist_count && (p - reply) < 140; k++) {
       char hex[16];
       mesh::Utils::toHex(hex, _prefs->fwd_whitelist_keys[k], 6); hex[12] = 0;  // 6-byte prefix
       p += sprintf(p, " | %s", hex);

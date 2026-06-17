@@ -178,6 +178,11 @@ node + CoreScope correlation — not reproducible on a low-traffic bench.
 - [x] Released `repeater-1.16.0.fwdfilter2` (Stage 1+2+3; tag push → CI → GitHub release, RAK4631 +
       Heltec V3). Release artifact pulled + flashed to the RAK + validated 4/4 on HW (ver, whitelist
       CLI, add+on+0hop, persistence across reboot).
+- [x] RF remote-admin verified (2026-06-17, `reference/rf_admin_test.py`): get/set fwd.whitelist work
+      over the air via the standard admin CLI (7/7). Requires ADMIN login (`isAdmin()`, MyMesh.cpp:762) —
+      a guest/blank login is silently ignored. Fixed a latent reply-buffer overflow: `get` handlers
+      capped at 200 bytes but the RF/serial reply buffer is ~160 (MyMesh temp[166] / main reply[160]) →
+      capped to <140 for both fwd.whitelist and fwd.block (truncates a long list instead of overflowing).
 - [ ] Production deploy on the exposed bridge repeater + CoreScope impact measurement
 - [ ] Next build: add dedicated `get fwd.hashfilter.prob` for set/get symmetry (MeshCore CLI convention;
       the combined `get fwd.hashfilter` already reports prob, so this is convention-only, deferred from
