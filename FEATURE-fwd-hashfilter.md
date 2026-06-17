@@ -175,7 +175,10 @@ node + CoreScope correlation — not reproducible on a low-traffic bench.
       GRP_TXT flood, non-exempt 0-hop); last-hop match on ambient multi-hop floods (`drop N-byte flood,
       last-hop XX not whitelisted`, seen at both 1-byte `63` and 3-byte `63D13A`). Note: deterministic
       last-hop testing needs ambient relayed traffic (controllable sender's origin is never a path hop).
-- [ ] Production deploy + CoreScope impact measurement
+- [x] Released `repeater-1.16.0.fwdfilter2` (Stage 1+2+3; tag push → CI → GitHub release, RAK4631 +
+      Heltec V3). Release artifact pulled + flashed to the RAK + validated 4/4 on HW (ver, whitelist
+      CLI, add+on+0hop, persistence across reboot).
+- [ ] Production deploy on the exposed bridge repeater + CoreScope impact measurement
 - [ ] Next build: add dedicated `get fwd.hashfilter.prob` for set/get symmetry (MeshCore CLI convention;
       the combined `get fwd.hashfilter` already reports prob, so this is convention-only, deferred from
       the fwdfilter1 release)
