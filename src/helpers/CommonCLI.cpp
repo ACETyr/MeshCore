@@ -103,7 +103,16 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     file.read((uint8_t *)&_prefs->fwd_block_count, sizeof(_prefs->fwd_block_count));     // 295
     file.read((uint8_t *)_prefs->fwd_block_keys, sizeof(_prefs->fwd_block_keys));        // 296
     file.read((uint8_t *)_prefs->fwd_block_actions, sizeof(_prefs->fwd_block_actions));  // 808
-    // next: 824
+    // last-hop whitelist; defaults to off/allow/empty if absent in an older /com_prefs
+    _prefs->fwd_whitelist_mode = 0;
+    _prefs->fwd_whitelist_zerohop = 1;   // default: allow 0-hop floods
+    _prefs->fwd_whitelist_count = 0;
+    memset(_prefs->fwd_whitelist_keys, 0, sizeof(_prefs->fwd_whitelist_keys));
+    file.read((uint8_t *)&_prefs->fwd_whitelist_mode, sizeof(_prefs->fwd_whitelist_mode));       // 824
+    file.read((uint8_t *)&_prefs->fwd_whitelist_zerohop, sizeof(_prefs->fwd_whitelist_zerohop)); // 825
+    file.read((uint8_t *)&_prefs->fwd_whitelist_count, sizeof(_prefs->fwd_whitelist_count));     // 826
+    file.read((uint8_t *)_prefs->fwd_whitelist_keys, sizeof(_prefs->fwd_whitelist_keys));        // 827
+    // next: 1339
 
     // sanitise bad pref values
     _prefs->rx_delay_base = constrain(_prefs->rx_delay_base, 0, 20.0f);
@@ -121,6 +130,9 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {
     _prefs->fwd_hashfilter_mode = constrain(_prefs->fwd_hashfilter_mode, 0, 2);
     _prefs->fwd_hashfilter_prob = constrain(_prefs->fwd_hashfilter_prob, 0, 100);
     if (_prefs->fwd_block_count > FWD_BLOCK_MAX) _prefs->fwd_block_count = 0;  // corrupt → drop table
+    _prefs->fwd_whitelist_mode = constrain(_prefs->fwd_whitelist_mode, 0, 1);
+    _prefs->fwd_whitelist_zerohop = constrain(_prefs->fwd_whitelist_zerohop, 0, 1);
+    if (_prefs->fwd_whitelist_count > FWD_WL_MAX) _prefs->fwd_whitelist_count = 0;  // corrupt → drop table
 
     // sanitise bad bridge pref values
     _prefs->bridge_enabled = constrain(_prefs->bridge_enabled, 0, 1);
@@ -204,6 +216,10 @@ void CommonCLI::savePrefs(FILESYSTEM* fs) {
     file.write((uint8_t *)&_prefs->fwd_block_count, sizeof(_prefs->fwd_block_count));     // 295
     file.write((uint8_t *)_prefs->fwd_block_keys, sizeof(_prefs->fwd_block_keys));        // 296
     file.write((uint8_t *)_prefs->fwd_block_actions, sizeof(_prefs->fwd_block_actions));  // 808
+    file.write((uint8_t *)&_prefs->fwd_whitelist_mode, sizeof(_prefs->fwd_whitelist_mode));       // 824
+    file.write((uint8_t *)&_prefs->fwd_whitelist_zerohop, sizeof(_prefs->fwd_whitelist_zerohop)); // 825
+    file.write((uint8_t *)&_prefs->fwd_whitelist_count, sizeof(_prefs->fwd_whitelist_count));     // 826
+    file.write((uint8_t *)_prefs->fwd_whitelist_keys, sizeof(_prefs->fwd_whitelist_keys));        // 827
     // next: 824
 
     file.close();
@@ -751,6 +767,59 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
     _prefs->fwd_block_count = 0;
     savePrefs();
     strcpy(reply, "OK");
+  } else if (memcmp(config, "fwd.whitelist.0hop ", 19) == 0) {
+    config += 19;
+    if (memcmp(config, "allow", 5) == 0) {
+      _prefs->fwd_whitelist_zerohop = 1; savePrefs(); strcpy(reply, "OK");
+    } else if (memcmp(config, "drop", 4) == 0) {
+      _prefs->fwd_whitelist_zerohop = 0; savePrefs(); strcpy(reply, "OK");
+    } else {
+      strcpy(reply, "Error, must be allow or drop");
+    }
+  } else if (memcmp(config, "fwd.whitelist.add ", 18) == 0) {
+    const char* hex = &config[18];
+    uint8_t key[PUB_KEY_SIZE];
+    if (strlen(hex) != PUB_KEY_SIZE * 2 || !mesh::Utils::fromHex(key, PUB_KEY_SIZE, hex)) {
+      strcpy(reply, "Error: need 64-hex pubkey");
+    } else if (_prefs->fwd_whitelist_count >= FWD_WL_MAX) {
+      strcpy(reply, "Error: table full");
+    } else {
+      int idx = -1;
+      for (int k = 0; k < _prefs->fwd_whitelist_count; k++)
+        if (memcmp(_prefs->fwd_whitelist_keys[k], key, PUB_KEY_SIZE) == 0) { idx = k; break; }
+      if (idx < 0) { idx = _prefs->fwd_whitelist_count++; memcpy(_prefs->fwd_whitelist_keys[idx], key, PUB_KEY_SIZE); }
+      savePrefs();
+      strcpy(reply, "OK");
+    }
+  } else if (memcmp(config, "fwd.whitelist.del ", 18) == 0) {
+    const char* hex = &config[18];
+    uint8_t key[PUB_KEY_SIZE];
+    int klen = min((int)strlen(hex), PUB_KEY_SIZE * 2) / 2;
+    int removed = 0;
+    if (klen >= 1 && mesh::Utils::fromHex(key, klen, hex)) {
+      for (int k = 0; k < _prefs->fwd_whitelist_count; ) {
+        if (memcmp(_prefs->fwd_whitelist_keys[k], key, klen) == 0) {
+          for (int j = k; j < _prefs->fwd_whitelist_count - 1; j++)
+            memcpy(_prefs->fwd_whitelist_keys[j], _prefs->fwd_whitelist_keys[j + 1], PUB_KEY_SIZE);
+          _prefs->fwd_whitelist_count--; removed++;
+        } else k++;
+      }
+    }
+    savePrefs();
+    sprintf(reply, "OK (%d removed)", removed);
+  } else if (memcmp(config, "fwd.whitelist.clear", 19) == 0) {
+    _prefs->fwd_whitelist_count = 0;
+    savePrefs();
+    strcpy(reply, "OK");
+  } else if (memcmp(config, "fwd.whitelist ", 14) == 0) {
+    config += 14;
+    if (memcmp(config, "on", 2) == 0) {
+      _prefs->fwd_whitelist_mode = 1; savePrefs(); strcpy(reply, "OK");
+    } else if (memcmp(config, "off", 3) == 0) {
+      _prefs->fwd_whitelist_mode = 0; savePrefs(); strcpy(reply, "OK");
+    } else {
+      strcpy(reply, "Error, must be on or off");
+    }
   } else if (memcmp(config, "loop.detect ", 12) == 0) {
     config += 12;
     uint8_t mode;
@@ -930,6 +999,16 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
       uint8_t a = _prefs->fwd_block_actions[k];
       p += sprintf(p, " | %s %s%s", hex, (a & FWD_BLOCK_PRUNE_PATH) ? "P" : "",
                    (a & FWD_BLOCK_DROP_ADVERT) ? "A" : "");
+    }
+  } else if (memcmp(config, "fwd.whitelist", 13) == 0) {
+    char* p = reply;
+    p += sprintf(p, "> %s 0hop=%s %d entr%s", _prefs->fwd_whitelist_mode ? "on" : "off",
+                 _prefs->fwd_whitelist_zerohop ? "allow" : "drop",
+                 (int)_prefs->fwd_whitelist_count, _prefs->fwd_whitelist_count == 1 ? "y" : "ies");
+    for (int k = 0; k < _prefs->fwd_whitelist_count && (p - reply) < 200; k++) {
+      char hex[16];
+      mesh::Utils::toHex(hex, _prefs->fwd_whitelist_keys[k], 6); hex[12] = 0;  // 6-byte prefix
+      p += sprintf(p, " | %s", hex);
     }
   } else if (memcmp(config, "loop.detect", 11) == 0) {
     if (_prefs->loop_detect == LOOP_DETECT_OFF) {

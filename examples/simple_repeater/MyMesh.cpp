@@ -607,6 +607,34 @@ bool MyMesh::filterRecvFloodPacket(mesh::Packet* pkt) {
       }
     }
   }
+  // Last-hop WHITELIST: when enabled, only relay a flood if its immediate sender (the last path
+  // hop, appended by the relay that just handed it to us) is allow-listed. Called before hasSeen(),
+  // so a whitelisted copy can still win even if a non-whitelisted copy arrived first. Exemptions
+  // prevent admin lockout: adverts (neighbour learning/discovery), ANON_REQ (login/initial contact),
+  // and floods addressed to this node always pass. Last-hop is matched at the packet's hash size
+  // (collision-prone at 1-byte -- operator should also enable `fwd.hashfilter all`).
+  if (_prefs.fwd_whitelist_mode != 0) {
+    uint8_t ptype = pkt->getPayloadType();
+    if (ptype == PAYLOAD_TYPE_ADVERT || ptype == PAYLOAD_TYPE_ANON_REQ) return false;  // exempt
+    if ((ptype == PAYLOAD_TYPE_TXT_MSG || ptype == PAYLOAD_TYPE_REQ
+         || ptype == PAYLOAD_TYPE_RESPONSE || ptype == PAYLOAD_TYPE_PATH)
+        && pkt->payload_len >= 1 && self_id.isHashMatch(&pkt->payload[0])) return false;  // for us
+    uint8_t n = pkt->getPathHashCount();
+    if (n == 0) {   // 0-hop flood: heard directly, originator not identifiable
+      if (_prefs.fwd_whitelist_zerohop) return false;   // allow
+      MESH_DEBUG_PRINTLN("fwd-filter: drop 0-hop flood (whitelist, 0hop=drop)");
+      return true;                                      // drop
+    }
+    uint8_t sz = pkt->getPathHashSize();
+    const uint8_t* last = &pkt->path[(n - 1) * sz];   // immediate sender = last appended hop
+    for (uint8_t k = 0; k < _prefs.fwd_whitelist_count; k++) {
+      if (memcmp(last, _prefs.fwd_whitelist_keys[k], sz) == 0) return false;  // whitelisted -> relay
+    }
+    char hx[9]; for (uint8_t b = 0; b < sz && b < 4; b++) sprintf(hx + b*2, "%02X", last[b]);
+    MESH_DEBUG_PRINTLN("fwd-filter: drop %d-byte flood, last-hop %s not whitelisted (%d entries)",
+                       (int)sz, hx, (int)_prefs.fwd_whitelist_count);
+    return true;  // last hop not whitelisted -> drop (not marked seen)
+  }
   // do normal processing
   return false;
 }

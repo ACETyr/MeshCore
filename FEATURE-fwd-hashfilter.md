@@ -86,6 +86,46 @@ Changes: `CommonCLI.h` (FWD_BLOCK_* defines + table fields), `CommonCLI.cpp` (pe
 
 RAM note: 16-entry table = 529 B, trivial on the nRF52840's 256 KB. Raise `FWD_BLOCK_MAX` only modestly.
 
+## Stage 3 — last-hop whitelist — implemented
+
+An opt-in **last-hop whitelist** for an exposed bridge repeater: only relay a flood if its immediate
+sender (the last path hop, appended by the relay that just handed it over) is on a curated allow-list
+of trusted backbone neighbours. Default OFF, repeater builds only.
+
+Locked design decisions:
+- **Hook `filterRecvFloodPacket`** — runs before `hasSeen()`, so a whitelisted copy can still win even
+  if a non-whitelisted copy arrived first. (`allowPacketForward` runs *after* `hasSeen()` → an earlier
+  non-whitelisted copy marks the packet seen and would suppress relaying the whitelisted copy =
+  first-packet-wins; wrong for a whitelist.)
+- **Exemptions (prevent admin lockout):** adverts (`PAYLOAD_TYPE_ADVERT`, neighbour learning/discovery),
+  `PAYLOAD_TYPE_ANON_REQ` (login/initial contact), and floods addressed to this node (dest_hash at
+  `payload[0]` matches self) always pass.
+- **0-hop floods** (empty path → originator not identifiable, not in path + encrypted): configurable
+  `set fwd.whitelist.0hop allow|drop`, **default allow**.
+- **Last-hop matched at the packet's hash size** (hash-size-independent). 1-byte is collision-prone
+  (~W/256 leak); operator should also enable `fwd.hashfilter all` to drop 1-byte floods deterministically.
+
+CLI (admin):
+- `set fwd.whitelist on|off`
+- `set fwd.whitelist.0hop allow|drop` (default allow)
+- `set fwd.whitelist.add <64-hex-pubkey>`
+- `set fwd.whitelist.del <hex-or-prefix>` — removes all entries matching the prefix
+- `set fwd.whitelist.clear`
+- `get fwd.whitelist` — echoes `mode 0hop=allow|drop N entries | <6-byte prefix>...`
+
+Changes: `CommonCLI.h` (`FWD_WL_MAX=16` + table fields: mode, zerohop, count, 16×32 keys),
+`CommonCLI.cpp` (persist /com_prefs offsets 824.. = mode+zerohop+count+16×32 keys ≈ 515 B; back-compat:
+off/allow/empty if absent; constrain; set + get handlers), `simple_repeater/MyMesh.cpp`
+(whitelist block in `filterRecvFloodPacket` with exemptions + 0-hop policy + last-hop match).
+
+### Recommendation for deployment
+Pair with `set fwd.hashfilter all` (drop collision-prone 1-byte floods) so only multibyte last-hops are
+whitelist-matched. Build the allow-list from observed relay-adjacency / active TRACE link verification
+(see `reference/kk_adjacency.py`, `trace_probe.py` in the observer project), NOT from `get neighbours`
+(advert-only, RAM-only, incomplete). Strong verified backbone links go in; high-delay-but-strong bridges
+(low relay frequency, high SNR) belong in too. 0-hop=allow for first deployment; switch to drop only once
+the backbone path is confirmed working.
+
 ## Bench testing (devboard, no traffic volume needed)
 
 Functional verification is about the forward/drop decision, not statistics — a handful of packets
@@ -126,6 +166,10 @@ node + CoreScope correlation — not reproducible on a low-traffic bench.
       `prune 2-byte flood via blocklisted hop XXXX (hop 9/10)` — and 0 prunes after clear. (Origin pubkey
       is never a path hop, so the controllable sender can't drive this; it's driven by ambient relayed
       traffic. RAK debug build now logs the matched hop bytes.)
+- [x] Stage 3 last-hop whitelist: NodePrefs fields + persistence (offsets 824..), CLI set/get,
+      `filterRecvFloodPacket` whitelist block with exemptions + 0-hop policy + last-hop match
+- [ ] Stage 3 build-verify (`pio run -e RAK_4631_repeater`) + 2-node bench test (whitelisted last-hop
+      relays / non-whitelisted dropped / advert + ANON_REQ + self-addressed exempt / 0-hop allow vs drop)
 - [ ] Production deploy + CoreScope impact measurement
 - [ ] Next build: add dedicated `get fwd.hashfilter.prob` for set/get symmetry (MeshCore CLI convention;
       the combined `get fwd.hashfilter` already reports prob, so this is convention-only, deferred from

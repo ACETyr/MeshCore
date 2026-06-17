@@ -24,6 +24,9 @@
 #define FWD_BLOCK_PRUNE_PATH   0x01   // drop flood copies whose path contains this node (filterRecvFloodPacket)
 #define FWD_BLOCK_DROP_ADVERT  0x02   // do not forward adverts originated by this node (allowPacketForward)
 
+// Last-hop forward whitelist (repeater builds): only relay floods whose immediate sender is allow-listed.
+#define FWD_WL_MAX             16
+
 struct NodePrefs { // persisted to file
   float airtime_factor;
   char node_name[32];
@@ -75,6 +78,11 @@ struct NodePrefs { // persisted to file
   uint8_t fwd_block_count;                          // active entries (0..FWD_BLOCK_MAX)
   uint8_t fwd_block_keys[FWD_BLOCK_MAX][32];        // PUB_KEY_SIZE
   uint8_t fwd_block_actions[FWD_BLOCK_MAX];
+  // Last-hop forward whitelist: only relay a flood if its immediate sender (last path hop) is listed.
+  uint8_t fwd_whitelist_mode;                       // 0 = off, 1 = on
+  uint8_t fwd_whitelist_zerohop;                    // 0 = drop 0-hop floods, 1 = allow (default)
+  uint8_t fwd_whitelist_count;                      // active entries (0..FWD_WL_MAX)
+  uint8_t fwd_whitelist_keys[FWD_WL_MAX][32];       // PUB_KEY_SIZE
 };
 
 class CommonCLICallbacks {
