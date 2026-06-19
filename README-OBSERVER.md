@@ -41,8 +41,8 @@ The image ships with **no** WiFi or broker settings.
 ```
 set wifi.ssid     <your-wifi-ssid>
 set wifi.pwd      <your-wifi-password>
-set mqtt.server   <broker-host>          ; prefix with mqtts:// for TLS (see below)
-set mqtt.port     <broker-port>          ; e.g. 8883 (TLS) or 1883 (plaintext)
+set mqtt.server   <broker-host>          ; MUST prefix mqtts:// for TLS — a bare host = plaintext mqtt:// (see TLS below)
+set mqtt.port     <broker-port>          ; e.g. 8883/9010 (TLS) or 1883 (plaintext)
 set mqtt.username <broker-user>
 set mqtt.password <broker-password>
 set mqtt.iata     <3-letter-code>        ; REQUIRED — an empty/"XXX" IATA blocks ALL publishing
@@ -73,10 +73,45 @@ emits **naive local** time instead, which CoreScope clamps to ingest time and fl
 (`clock_naive`/`clock_skew`). Leave `mqtt.timezone` unset for CoreScope feeds. (A local human-
 facing broker is unaffected.)
 
+## ⚠️ Memory: one or two TLS connections max on the Heltec V3
+
+The Heltec V3 has **no PSRAM** — WiFi, TLS and MQTT all share the ESP32-S3's ~512 KB internal
+RAM. Each TLS/MQTT connection needs a sizeable contiguous mbedTLS buffer, so the board can
+realistically sustain **one, at most two** concurrent TLS connections.
+
+The two **LetsMesh analyzer** feeds (`mqtt.analyzer.us` / `mqtt.analyzer.eu`) default to **on**.
+Together with your own `mqtts://` broker that is **three** TLS connections — enough to fragment the
+heap below the publish threshold. The tell in the serial log:
+
+```
+MQTT: Skipping publish due to memory pressure (Max alloc: 16116, skipped: N)
+```
+
+`Max alloc` is the largest free block; the bridge **drops** every publish while it is < 60 KB, and
+the pressure can also trigger `rst:0xc (RTC_SW_CPU_RST)` reboots.
+
+If you only publish to your own broker, turn the analyzers off:
+
+```
+set mqtt.analyzer.us off
+set mqtt.analyzer.eu off
+reboot
+```
+
+Three TLS clients → one clears the pressure. Disabling just one analyzer (→ two) may suffice if you
+want to keep some LetsMesh coverage, but one is the safe target on this board.
+
 ## TLS
 
 TLS is selected per broker by the **URI scheme**: set `mqtt.server mqtts://<host>` (or `wss://`)
 to use TLS; a bare host stays plaintext `mqtt://`.
+
+> **Forgot the `mqtts://`?** A bare host against a TLS-only broker port connects at TCP and is
+> then reset by the broker mid-handshake. The serial log shows the host with **no** scheme plus a
+> clean reset — `errno = Connection reset by peer` / `socket errno: 0x68` (= 104, ECONNRESET) /
+> `MQTT connect failed`. (An untrusted-cert problem looks different — mbedTLS handshake errors,
+> not a peer reset.) Fix: `set mqtt.server mqtts://<host>`, `reboot`, confirm with
+> `get mqtt.server` that the value echoes back **with** the prefix.
 
 - **Default (`…_observer_mqtt` env):** TLS verifies against the public mbedTLS CA bundle — works
   for any broker presenting a publicly-trusted certificate.
