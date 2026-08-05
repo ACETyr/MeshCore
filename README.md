@@ -1,3 +1,19 @@
+<!-- ACETyr fork banner — keep at top across rebases -->
+> ### 📡 ACETyr fork — MQTT observer firmware (Room Server)
+> You are on branch **`room-server-observer-116`**, the fork's **observer** line: a Room Server for the **Heltec LoRa32 V3** that also bridges heard mesh packets to an **MQTT broker**. Based on mainline **v1.16.0**, plus the SNR/RSSI and zone-aware-UTC-timestamp fixes (upstream PRs #13/#14, cherry-picked) and per-broker TLS on the main-broker connect path.
+>
+> **No credentials are baked into any build** — broker, WiFi and radio region are configured at runtime over the serial CLI. A room server almost never transmits, which suits the observer role: a node is blind to the mesh during its own TX.
+>
+> 📖 **Build envs, first-time configuration and operational caveats (NTP, TLS, timezone): [README-OBSERVER.md](./README-OBSERVER.md)**
+>
+> Not published through GitHub releases — observer builds are handed out directly on request.
+>
+> ⚠️ **This branch is not the repeater forward filter.** That is a separate line of work in this repo, on branch [`repeater-fwdfilter-main`](https://github.com/ACETyr/MeshCore/tree/repeater-fwdfilter-main) (releases `repeater-v1.16.0.fwdfilterN`) — an ordinary `simple_repeater` build with no MQTT, room-server or observer code in it. The two share only the mainline base.
+>
+> ℹ️ GitHub shows *"forked from agessaman/MeshCore"* — fork-network metadata from when this repo was created; it does not describe the code base.
+
+---
+
 ## About MeshCore
 
 MeshCore is a lightweight, portable C++ library that enables multi-hop packet routing for embedded projects using LoRa and other packet radios. It is designed for developers who want to create resilient, decentralized communication networks that work without the internet.
