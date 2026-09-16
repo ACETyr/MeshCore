@@ -19,6 +19,7 @@ Fork-original work (the forward filter, `/fwd_prefs`, the airtime guard) is not 
 | Upstream PR | https://github.com/meshcore-dev/MeshCore/pull/2933 (OPEN) |
 | Applied as | `a028adcb` (median only), **refreshed to PR head `fa6557f8` in the 1.17.1 replant** |
 | Files | `src/helpers/radiolib/RadioLibWrappers.{h,cpp}` |
+| Carried scope | the noise-floor estimator only. The PR's later RX-desync watchdog (`5017924c` and after) is **not** carried — open decision, see below |
 | Fork issue | ACETyr/MeshCore#3 |
 
 **The patch is usrflo's work, applied essentially verbatim** — the `sortInt16()` helper, the
@@ -56,6 +57,43 @@ PR as `pull/2933#issuecomment-5309823975`.
 
 ⚠️ **This is an unmerged PR that moved twice in six days.** Re-diff against the PR head at every
 replant rather than assuming the carried copy is current — that is exactly how it went stale here.
+
+⚠️ **Refreshing to the head no longer means taking the whole head — and that split needs re-deciding,
+not re-reading.** On **2026-09-03** the PR outgrew its title: `5017924c` adds an **RX-desync
+watchdog** (`verifyRxChipMode()`, 10 s poll, `resetAGC()` self-heal, `ERR_EVENT_RX_DESYNC`), which
+has nothing to do with the ratchet. We are pinned at `fa6557f8` (2026-08-12) and therefore do not
+carry it. That is a decision with a date on it, and here is what it rested on:
+
+- **As written in `5017924c` the watchdog misfires on a healthy radio**, through a RadioLib bug:
+  `SX126x::getStatus()` calls `SPIreadStream(..., numBytes = 0)` and never copies the status byte
+  out, so it returns 0 unconditionally and `((getStatus() >> 4) & 0x07) == 0x05` is always false.
+  agessaman measured it on a RAK4631 (`pull/2933#issuecomment-5672571602`): 14 receiver resets in
+  130 s on an *idle, healthy* node, 337/h under traffic, `ERR_EVENT_RX_DESYNC` set and the node
+  reporting "reboot suggested". On SX126x each of those is a warm sleep, standby and full
+  recalibration — not a cheap status retry.
+- **usrflo confirmed and fixed it the same day**, `3e55f997` (2026-09-15): a raw `[GetStatus, NOP]`
+  transaction over the module HAL, taking byte 1. Upstream RadioLib issue jgromes/RadioLib#1872 filed
+  for the root cause. The fix is HW-validated **on his rig** (Wio Tracker L1 / nRF52840) — not on a
+  RAK4631, not on a Heltec V3, i.e. not on anything this branch publishes.
+
+**Re-evaluate at the next replant, and write the answer down.** Do not treat "we skipped the
+watchdog" as standing policy — work these four points:
+
+1. Is jgromes/RadioLib#1872 fixed, and has MeshCore moved its pinned RadioLib (was `6d893483`)? If
+   both, `3e55f997`'s raw-SPI workaround may itself be obsolete or in conflict.
+2. Has the watchdog been measured on a **RAK4631 or Heltec V3** by anyone, us or upstream? If not and
+   we want it, that is a bench run, not a diff review — the failure mode presents as a *healthy* node,
+   so reading the code is exactly what will not catch it. Signature to look for: `resetAGC()` cadence,
+   `stats-radio` `rx_desync`, `stats-core` `errors: 8` on an idle node.
+3. Do we want the self-heal at all, or only its instrument? `sx126xGetStatus()` on its own answers
+   "is the SX1262 actually in RX right now", which we currently cannot ask — potentially useful for
+   the open receiver-deafness question on the field nodes, and separable from the 10 s reset loop.
+4. Record the outcome and the date here either way. "Still out of scope, re-checked YYYY-MM-DD,
+   because X" is a result. Silence reads as staleness and is how `a028adcb` went stale.
+
+Note for anyone debugging in the meantime: mainline's own `MESH_DEBUG_PRINTLN("SX1262 status=0x%02X …")`
+in `CustomSX1262.h` hits the same RadioLib bug, so a boot log showing `status=0x00` carries no
+information — it is that constant, not a chip fault.
 
 **Removal condition.** Drop this patch when mainline merges a fix for the ratchet, then re-verify on
 the bench rig before release. Two competing PRs are open and neither has a maintainer review:
