@@ -91,6 +91,35 @@ watchdog" as standing policy — work these four points:
 4. Record the outcome and the date here either way. "Still out of scope, re-checked YYYY-MM-DD,
    because X" is a result. Silence reads as staleness and is how `a028adcb` went stale.
 
+**Re-checked 2026-09-25 — still out of scope. Point 1 is half-answered, points 2 and 3 are
+untouched.** A maintainer fix for #1872 is now in flight, but nothing has merged and the pin has not
+moved, so the split stands unchanged.
+
+- **jgromes/RadioLib#1872 is still open, but no longer unowned.** jgromes assigned and labelled it
+  and commented on 2026-09-22: the diagnosis is right, but `3e55f997`'s approach is not the whole
+  fix. SX126x and SX128x differ — on SX126x the first byte is RFU, on SX128x it is already status —
+  and with a plain extra NOP the value `getStatus()` *returns* on SX128x differs from the one the
+  library processes internally (0x43 against 0x40). His fix sets the SPI status width properly and
+  drops it to 0 for the `GetStatus` transaction only. Filed as **jgromes/RadioLib#1876**
+  ("[SX126x][SX128x] Fix GetStatus", head `6900cd25`, base `master`, `Closes #1872`) — **open, not
+  merged**. usrflo verified the SX126x half on his own rig on 2026-09-23: 120/120 polls of the fixed
+  `getStatus()` byte-identical to the raw-SPI reference, `getDeviceErrors()` clean, no regression in
+  any exercised read path. SX128x unverified — no hardware on his side.
+- **MeshCore has not moved its pin.** `platformio.ini:23` is
+  `6d8934836678d8894e3d556550475b37dce3e2b6` on upstream `dev` *and* `main`, identical to this
+  branch. RadioLib's 8.0.0 release PR **#1867 is also still open**; #1876 targets `master`, so the
+  fix can land independently of 8.0.0.
+- ⇒ **`3e55f997`'s raw-SPI workaround is not obsolete yet and conflicts with nothing here** — this
+  branch carries neither it nor the watchdog. What would make it obsolete is now concrete and
+  watchable: #1876 merged **and** MeshCore repinned away from `6d89348`. Once both hold, the only
+  argument left against the watchdog is point 2, and point 2 is unmoved: still nobody, us or
+  upstream, has measured it on a RAK4631 or a Heltec V3.
+- **#2933 itself gained nothing functional.** Head moved `3e55f997` → **`9f2e4b5d`** (2026-09-23),
+  a comment-only commit (`src/helpers/radiolib/SX126xReset.h`, +5/−0) linking #1872 and #1876 from
+  the workaround. Still open, still no maintainer review, no PR comment since 2026-09-16.
+- **Removal condition not triggered.** Neither ratchet PR merged; #2842 unmoved since 2026-08-10
+  (`bafa673a`). `fa6557f8` remains the correct pin.
+
 Note for anyone debugging in the meantime: mainline's own `MESH_DEBUG_PRINTLN("SX1262 status=0x%02X …")`
 in `CustomSX1262.h` hits the same RadioLib bug, so a boot log showing `status=0x00` carries no
 information — it is that constant, not a chip fault.
