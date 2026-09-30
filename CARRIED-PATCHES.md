@@ -120,6 +120,37 @@ moved, so the split stands unchanged.
 - **Removal condition not triggered.** Neither ratchet PR merged; #2842 unmoved since 2026-08-10
   (`bafa673a`). `fa6557f8` remains the correct pin.
 
+**Re-checked 2026-10-01 — points 1 and 2 are now ANSWERED, and one line above was wrong.**
+usrflo asked (Signal, via Chris) for a test of the current head so it can go into the next UFO
+build, and specifically for it to be tested as `#2933` merged into `dev` rather than onto this fork.
+
+- ❌ **Correction to the 2026-09-25 entry: RadioLib #1876 was already merged when that was written.**
+  It landed **2026-09-23 17:00 UTC** and #1872 is closed as completed. The entry above says "open,
+  not merged". MeshCore's pin has *not* moved (`6d893483` on `dev` and `main`), so the practical
+  conclusion is unchanged — `3e55f997` is still doing real work — but the watch item is now only a
+  pin bump, not an upstream fix. usrflo says he will drop the wrapper once MeshCore repins.
+- ✅ **Point 2 is measured.** `dev` `bbe54f8c` + `9f2e4b5d` merged clean (11 files, +228/−31), built
+  and run on the bench RAK4631. **No false positives**: 900 s idle → 0 episodes, `rx_desync 0`,
+  `errors 0`, 225 blocks all −101; 443 s with 318 adverts → 0 episodes. agessaman's pre-fix rates
+  would have given ≈97 and ≈41. The raw read returns **0x52** (chip mode RX) on this board, **0x22**
+  (STDBY_RC) while wedged — so `3e55f997` works on SX1262/RAK4631, not only on his Wio Tracker L1.
+- ✅ **True-positive control run**, which nobody had done: a bench hook calls `_radio->standby()`
+  without touching `state`. Detect +9.3 s, re-arm +19.3 s, resolve +29.3 s, `rx_desync 1`, `errors 0`
+  (fatal correctly not reached), and the receiver genuinely came back — 57 of 58 adverts heard before
+  the fault, 57 of 58 after. Zero episodes on a healthy node is otherwise indistinguishable from a
+  build without the watchdog.
+- ⚠️ **New finding, reported upstream, not a blocker for us:** during an episode the estimator keeps
+  publishing and reaches the −120 clamp. The discard runs at poll cadence (10 s) while a block spans
+  ~3.2 s, so ~3 contaminated blocks slip through per interval; afterwards the one-sided hold rejects
+  the *correct* floor twice, leaving −120 standing for ~71 s after the chip was back in RX. Inert
+  here (`int.thresh 0`), but it is the PR's own failure mode reached through its other feature.
+- **Decision unchanged for now: still estimator-only.** The watchdog is now evidenced on our board
+  class, so point 2 no longer blocks adopting it — but nothing on this branch needs it, and it should
+  not ride in on a measurement errand. Reconsider deliberately at the next replant, with point 3
+  (`sx126xGetStatus()` as an *instrument* for the field nodes' receiver-deafness question) as the
+  more interesting half. Draft comment: `upstream-issues/COMMENT-2933-9f2e4b5d-watchdog.md`, logs
+  `nf-runs/armW{1,2,3,4}-*.log`.
+
 Note for anyone debugging in the meantime: mainline's own `MESH_DEBUG_PRINTLN("SX1262 status=0x%02X …")`
 in `CustomSX1262.h` hits the same RadioLib bug, so a boot log showing `status=0x00` carries no
 information — it is that constant, not a chip fault.
