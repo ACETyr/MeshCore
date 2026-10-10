@@ -17,7 +17,7 @@ Geräteliste lädst du die Datei aus den
 ## Schritt 1 — Die richtige Datei herunterladen
 
 Immer die **neueste** Release-Version nehmen ([Releases](https://github.com/ACETyr/MeshCore/releases)),
-ältere enthalten behobene Fehler. Welche der vier bis sechs Dateien du brauchst, hängt vom Board ab —
+ältere enthalten behobene Fehler. Welche der Dateien du brauchst, hängt vom Board ab —
 und davon, ob du **updaten** oder **neu aufsetzen** willst:
 
 | Board | Update (Konfiguration bleibt) | Erstflash / komplett neu | OTA über Funk |
@@ -25,6 +25,7 @@ und davon, ob du **updaten** oder **neu aufsetzen** willst:
 | **RAK4631** (nRF52840) | `…​.zip` | `…​.zip` | `…​.zip` |
 | **Heltec V3** (ESP32-S3) | `…​.bin` (**ohne** `merged`) | `…​-merged.bin` | `…​.bin` (**ohne** `merged`) |
 | **SenseCAP Solar Node P1** (nRF52840) | `…​.zip` | `…​.zip` | `…​.zip` |
+| **Seeed XIAO nRF52840 + Wio-SX1262** | `…​.zip` | `…​.zip` | `…​.zip` |
 
 Bei den nRF52-Boards ist es immer dieselbe `.zip` — ein DFU-Paket, das nur die Anwendung ersetzt und
 Konfiguration wie Identität in Ruhe lässt. Die zusätzlich beiliegende `.uf2` ist eine Alternative für
@@ -47,6 +48,11 @@ Bei Heltec V3 hängt alles an dieser einen Unterscheidung:
 > boardunabhängig und übersetzt sauber, aber behandle diese Binaries als ungeprüft. Rückmeldungen von
 > P1-Betreibern sind ausdrücklich willkommen.
 
+> ℹ️ Die **XIAO-Firmware** ist auf dem Kit aus XIAO nRF52840 und aufgestecktem **Wio-SX1262**
+> getestet (Seeed-Artikel 102010710) und setzt genau dessen Pinbelegung voraus. Ein XIAO mit anderem
+> LoRa-Modul — etwa einem E22 oder der Wio-SX1262-Variante mit 30-poligem Board-to-Board-Stecker —
+> funktioniert mit diesem Image nicht.
+
 ---
 
 ## Schritt 2 — Flashen
@@ -62,8 +68,10 @@ Browser: **Chrome oder Edge**. Firefox und Safari können kein WebSerial und fun
    anklicken und die heruntergeladene Datei aus Schritt 1 auswählen. Der Flasher erkennt am Dateityp
    selbst, worum es sich handelt: `.zip` → nRF52, `.bin` → ESP32.
 3. Gerät per USB anstecken.
-4. **Nur bei RAK4631 / SenseCAP P1:** das Gerät in den DFU-Modus bringen — entweder mit der Schaltfläche
-   **„Enter DFU mode“** im Flasher, oder von Hand durch **zweimaliges kurzes Drücken der Reset-Taste**.
+4. **Nur bei den nRF52-Boards (RAK4631, SenseCAP P1, XIAO):** das Gerät in den DFU-Modus bringen —
+   entweder mit der Schaltfläche **„Enter DFU mode“** im Flasher, oder von Hand durch **zweimaliges
+   kurzes Drücken der Reset-Taste**. Der XIAO meldet sich im DFU-Modus unter einem **anderen
+   seriellen Port** an als im Betrieb — im nächsten Schritt also den neu aufgetauchten Port wählen.
 5. Flashen starten, seriellen Port auswählen, warten.
 
 Wählst du eine `-merged.bin`, zeigt der Flasher eine Warnung, dass der Flash gelöscht wird — das ist
@@ -93,7 +101,7 @@ Ohne jedes Werkzeug, nur Dateimanager. Kann den Knoten nicht unbrauchbar machen.
 
 1. Gerät per USB anstecken.
 2. **Reset-Taste zweimal kurz hintereinander drücken.** Es erscheint ein USB-Laufwerk
-   (bei RAK4631 heißt es `RAK4631`).
+   (beim RAK4631 heißt es `RAK4631`, beim XIAO je nach Bootloader `XIAO-SENSE` oder `XIAO-BOOT`).
 3. Die `.uf2`-Datei auf dieses Laufwerk kopieren.
 4. Das Laufwerk verschwindet von selbst, das Gerät startet neu. Fertig.
 
@@ -102,7 +110,7 @@ Die `.uf2` ersetzt nur die Anwendung, Konfiguration und Identität bleiben erhal
 Klappt der Doppel-Reset nicht: langsamer probieren (zwei getrennte Klicks, nicht ein Doppelklick),
 anderes USB-Kabel testen — viele Kabel können nur laden, nicht Daten übertragen.
 
-### Weg D — Über Funk, nRF52-Boards (RAK4631, SenseCAP P1)
+### Weg D — Über Funk, nRF52-Boards (RAK4631, SenseCAP P1, XIAO)
 
 Für Knoten, an die du nicht mehr physisch herankommst. Du brauchst BLE-Reichweite zum Gerät und
 Admin-Zugang über Funk.
@@ -125,6 +133,11 @@ noch einmal absetzen — der OTA-Modus läuft nach einiger Zeit ab.
 > erkennt eine ungültige Anwendungs-Firmware und fällt selbsttätig in den OTA-DFU-Modus zurück, statt
 > den Knoten tot am Mast zu lassen. Ein abgebrochener OTA-Flash ist damit kein Kletter-Einsatz mehr.
 > Hintergrund: <https://blog.meshcore.io/2026/04/06/otafix-bootloader>
+>
+> Für den **XIAO** gibt es zwei OTAFIX-Varianten, `xiao_nrf52840_ble` und `xiao_nrf52840_ble_sense`.
+> Welche passt, steht in der Datei `INFO_UF2.TXT` auf dem USB-Laufwerk (doppelter Reset): enthält
+> die Zeile `Board-ID` das Wort `Sense`, die `_sense`-Variante nehmen, sonst die andere. Das Update
+> über Funk ist beim XIAO bisher nicht erprobt, nur der Weg über USB.
 
 ### Weg E — Über Funk, Heltec V3
 

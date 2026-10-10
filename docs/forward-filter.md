@@ -592,7 +592,7 @@ Practical consequences:
 | `fwdfilter7` | 2026-07-13 | Fix: airtime estimate guarded against error codes · version string gained a leading `v` |
 | `fwdfilter8` | 2026-08-10 | Rebased onto MeshCore 1.17.0 · Fix: stage 4 measures over a 60 s window instead of the hour bucket (1–99 was previously inert) · Fix: noise-floor estimator could latch at −120 · Fix: the guarded airtime estimate aborted in-flight transmits |
 | `fwdfilter9` | 2026-08-16 | Rebased onto MeshCore 1.17.1 · carried noise-floor fix brought up to date (no change to any `fwd.*` command) |
-| `fwdfilter10` | pending | Stage 5 (`fwd.chan.block`) + `get fwd.chan` / `get fwd.chan.stats` |
+| `fwdfilter10` | 2026-08-17 | Stage 5 (`fwd.chan.block`) + `get fwd.chan` / `get fwd.chan.stats` · build target Seeed XIAO nRF52840 + Wio-SX1262 added on 2026-10-10 (same firmware, no new version) |
 
 **Recommendation: always run the newest release.** Every older one carries at least one of the bugs
 fixed above.

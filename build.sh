@@ -207,7 +207,7 @@ build_all_firmwares_by_suffix() {
 #                                         .github/workflows/firmware-builder.yml
 #
 # Mainline builds EVERY *_repeater env. This fork must not. The forward filters are
-# censorship-capable, and only two boards are hardware-tested — shipping the full ~89-board matrix
+# censorship-capable, and only three boards are hardware-tested — shipping the full ~89-board matrix
 # would put untested fork firmware on hardware nobody here can verify, and would contradict the
 # target list stated in docs/ and in the release notes.
 #
@@ -219,6 +219,7 @@ FORK_REPEATER_TARGETS=(
   "RAK_4631_repeater"         # hardware-tested
   "Heltec_v3_repeater"        # hardware-tested
   "SenseCap_Solar_repeater"   # build-validated only: nRF52840+SX1262, RAK4631-class, no P1 on hand
+  "Xiao_nrf52_repeater"       # hardware-tested: XIAO nRF52840 + Wio-SX1262 kit pinout only (#11)
 )
 
 build_repeater_firmwares() {

@@ -24,6 +24,7 @@ on whether you want to **update** or **start fresh**:
 | **RAK4631** (nRF52840) | `…​.zip` | `…​.zip` | `…​.zip` |
 | **Heltec V3** (ESP32-S3) | `…​.bin` (**no** `merged`) | `…​-merged.bin` | `…​.bin` (**no** `merged`) |
 | **SenseCAP Solar Node P1** (nRF52840) | `…​.zip` | `…​.zip` | `…​.zip` |
+| **Seeed XIAO nRF52840 + Wio-SX1262** | `…​.zip` | `…​.zip` | `…​.zip` |
 
 On the nRF52 boards it is always the same `.zip` — a DFU package that replaces only the application and
 leaves configuration and identity alone. The `.uf2` that also ships is an alternative for the
@@ -45,6 +46,11 @@ On the Heltec V3 everything hinges on one distinction:
 > available. The filter code is board-agnostic and compiles cleanly, but treat these binaries as
 > unverified. Feedback from P1 operators is very welcome.
 
+> ℹ️ The **XIAO firmware** is tested on the kit of XIAO nRF52840 with a **Wio-SX1262** stacked on
+> top (Seeed part 102010710) and assumes exactly that pinout. A XIAO with a different LoRa module —
+> an E22, say, or the Wio-SX1262 variant with the 30-pin board-to-board connector — will not work
+> with this image.
+
 ---
 
 ## Step 2 — flash it
@@ -60,8 +66,10 @@ Browser: **Chrome or Edge**. Firefox and Safari cannot do WebSerial and will not
    bottom and select the file you downloaded in step 1. The flasher works out the target from the file
    type: `.zip` → nRF52, `.bin` → ESP32.
 3. Connect the device over USB.
-4. **RAK4631 / SenseCAP P1 only:** put the device into DFU mode — either with the **"Enter DFU mode"**
-   button in the flasher, or manually by **pressing the reset button twice in quick succession**.
+4. **nRF52 boards only (RAK4631, SenseCAP P1, XIAO):** put the device into DFU mode — either with
+   the **"Enter DFU mode"** button in the flasher, or manually by **pressing the reset button twice
+   in quick succession**. In DFU mode the XIAO shows up on a **different serial port** than in
+   normal operation, so pick the newly appeared port in the next step.
 5. Start flashing, pick the serial port, wait.
 
 If you select a `-merged.bin`, the flasher shows a warning that the flash will be erased — that is
@@ -91,7 +99,7 @@ No tooling at all, just a file manager. Cannot brick the node.
 
 1. Connect the device over USB.
 2. **Press the reset button twice in quick succession.** A USB drive appears (named `RAK4631` on the
-   RAK4631).
+   RAK4631; on the XIAO `XIAO-SENSE` or `XIAO-BOOT`, depending on the bootloader).
 3. Copy the `.uf2` file onto that drive.
 4. The drive disappears on its own and the device reboots. Done.
 
@@ -100,7 +108,7 @@ The `.uf2` replaces only the application; configuration and identity are preserv
 If the double reset does not work: try slower (two separate clicks, not a double-click), and try
 another USB cable — many cables can only charge, not carry data.
 
-### Route D — over the air, nRF52 boards (RAK4631, SenseCAP P1)
+### Route D — over the air, nRF52 boards (RAK4631, SenseCAP P1, XIAO)
 
 For nodes you can no longer reach physically. You need BLE range to the device and admin access over
 the air.
@@ -122,6 +130,11 @@ If the device does not appear in the list: enable `Force Scanning` in the DFU ap
 > invalid application firmware and falls back to OTA DFU mode by itself, instead of leaving the node
 > dead on the mast. An aborted OTA flash then stops being a climbing job. Background:
 > <https://blog.meshcore.io/2026/04/06/otafix-bootloader>
+>
+> For the **XIAO** there are two OTAFIX variants, `xiao_nrf52840_ble` and `xiao_nrf52840_ble_sense`.
+> Which one fits is in `INFO_UF2.TXT` on the USB drive (double reset): if the `Board-ID` line
+> contains `Sense`, take the `_sense` variant, otherwise the other one. Over-the-air updates have
+> not been tried on the XIAO yet, only the USB routes.
 
 ### Route E — over the air, Heltec V3
 

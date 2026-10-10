@@ -606,7 +606,7 @@ Praktische Folgen:
 | `fwdfilter7` | 2026-07-13 | Fix: Airtime-Schätzung gegen Fehlercodes abgesichert · Version mit führendem `v` |
 | `fwdfilter8` | 2026-08-10 | Basis auf MeshCore 1.17.0 · Fix: Stufe 4 misst über ein 60-s-Fenster statt über den Stundenbucket (1–99 war zuvor wirkungslos) · Fix: Schätzung des Grundrauschens klemmte auf −120 fest · Fix: abgesicherte Airtime-Schätzung brach laufende Sendungen ab |
 | `fwdfilter9` | 2026-08-16 | Basis auf MeshCore 1.17.1 · mitgetragene Korrektur der Grundrauschen-Schätzung auf den aktuellen Stand gebracht (keine Änderung an den `fwd.*`-Kommandos) |
-| `fwdfilter10` | offen | Stufe 5 (`fwd.chan.block`) + `get fwd.chan` / `get fwd.chan.stats` |
+| `fwdfilter10` | 2026-08-17 | Stufe 5 (`fwd.chan.block`) + `get fwd.chan` / `get fwd.chan.stats` · am 2026-10-10 Build-Ziel Seeed XIAO nRF52840 + Wio-SX1262 nachgereicht (dieselbe Firmware, keine neue Version) |
 
 **Empfehlung: immer die neueste Version.** Alle älteren enthalten mindestens einen der oben
 behobenen Fehler.
